@@ -1,0 +1,414 @@
+% ============================================================
+% research_report.tex
+% Generalizable Deepfake Speech Detection Using SVMs
+% with Calibrated Probabilistic Inference
+% Course: 22MAT220 – Mathematics for Computing III
+% ============================================================
+
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{cite}
+
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+% ─────────────────────────────────────────────
+\begin{document}
+
+\title{Generalizable Deepfake Speech Detection Using Support Vector Machines
+with Calibrated Probabilistic Inference}
+
+\author{
+  \IEEEauthorblockN{[Author 1 Name] \quad [Roll Number]}
+  \IEEEauthorblockA{Amrita School of Engineering, Bengaluru\\
+  Department of Artificial Intelligence and Data Science\\
+  \texttt{[email@blr.amrita.edu]}}
+  \and
+  \IEEEauthorblockN{[Author 2 Name] \quad [Roll Number]}
+  \IEEEauthorblockA{Amrita School of Engineering, Bengaluru\\
+  Department of Artificial Intelligence and Data Science\\
+  \texttt{[email@blr.amrita.edu]}}
+  \and
+  \IEEEauthorblockN{Supervisor: [Faculty Name]}
+  \IEEEauthorblockA{Department of Mathematics\\
+  Amrita School of Engineering, Bengaluru}
+}
+
+\maketitle
+
+% ─────────────────────────────────────────────
+\begin{abstract}
+The rapid proliferation of AI-generated speech synthesis has created an urgent need
+for automatic deepfake audio detection systems. This paper presents a complete,
+mathematically rigorous pipeline for binary classification of speech recordings as
+\emph{real} (authentic human speech) or \emph{fake} (AI-generated/converted speech),
+using Support Vector Machines (SVMs) trained on handcrafted acoustic features.
+Our implementation includes a Linear SVM derived from first principles using NumPy
+and mini-batch subgradient descent with convergence analysis, alongside scikit-learn
+baselines (LinearSVC, SVC with RBF kernel, Logistic Regression, Random Forest).
+Features include Mel-Frequency Cepstral Coefficients (MFCC), Linear-Frequency Cepstral
+Coefficients (LFCC), and spectral/prosodic statistics, with a systematic ablation study.
+Probability estimates are obtained via Platt scaling on a held-out calibration set.
+The system is evaluated on the ASVspoof~2019 Logical Access benchmark and an
+independent external dataset to assess generalization beyond training conditions.
+An interactive Gradio-based web application (EchoVerify AI) allows faculty or end-users
+to upload arbitrary audio files and receive calibrated REAL/FAKE probability estimates
+in real time. We report all evaluation metrics honestly, including the generalization
+gap between internal and external performance, and explicitly document limitations.
+\end{abstract}
+
+\begin{IEEEkeywords}
+deepfake audio detection, support vector machines, hinge loss, Platt scaling,
+MFCC, LFCC, ASVspoof, anti-spoofing, subgradient descent, calibrated probabilities
+\end{IEEEkeywords}
+
+% ─────────────────────────────────────────────
+\section{Introduction}
+\label{sec:intro}
+
+Voice synthesis technology has advanced to the point where AI-generated speech is
+perceptually indistinguishable from authentic human speech \cite{wavenet2016, tacotron2017}.
+Text-to-speech (TTS) systems based on neural vocoders and transformer architectures
+can clone a speaker's voice from a few seconds of reference audio \cite{valle2023}.
+This creates serious risks: audio deepfakes have been used in fraud, misinformation,
+and identity impersonation.
+
+Automatic Speaker Verification (ASV) systems~\cite{asvspoof2019} are increasingly
+targeted by such attacks. The ASVspoof challenge series provides a standardized
+benchmark for Countermeasure (CM) development. Existing state-of-the-art detectors
+use deep learning (Wav2Vec, RawBoost, AASIST~\cite{jung2022aasist}) and achieve near-zero
+equal error rates on in-domain data, but suffer significant degradation on novel generators.
+
+This project takes a principled approach rooted in the objectives of the course
+22MAT220 (Mathematics for Computing~III): we implement the complete mathematical
+machinery of SVMs from scratch, provide convergence analysis, and deploy a fully
+functional interactive inference system. While neural approaches are discussed as
+future work, the core contribution is an academically defensible SVM-based detector
+with calibrated probabilistic output.
+
+\subsection{Contributions}
+\begin{enumerate}
+  \item A NumPy SVM implementation from first principles with subgradient analysis.
+  \item A comparative study across five model families.
+  \item A feature ablation study (MFCC, LFCC, spectral, prosodic).
+  \item Platt-calibrated probability estimates with ECE analysis.
+  \item External generalization evaluation with gap analysis.
+  \item An interactive web application (EchoVerify AI) launchable from Google Colab.
+\end{enumerate}
+
+% ─────────────────────────────────────────────
+\section{Literature Review}
+\label{sec:literature}
+
+Sahidullah et al.~\cite{sahidullah2015} established MFCC and LFCC baselines for
+ASVspoof~2015, demonstrating that linear-frequency features outperform mel-scale
+features for detecting TTS attacks because the linear scale preserves high-frequency
+vocoder artefacts. This insight motivates our combined MFCC+LFCC feature set.
+
+The ASVspoof~2019~\cite{asvspoof2019} challenge introduced 19 attack types and showed
+that Gaussian Mixture Model (GMM) classifiers using LFCCs achieve competitive baseline
+performance, with Equal Error Rates under 5\% on the development set. However, these
+baselines degrade significantly on the evaluation set containing new generators,
+confirming the generalization challenge.
+
+Todisco et al.~\cite{todisco2016} proposed Constant-Q Cepstral Coefficients (CQCCs)
+as an alternative to MFCC and LFCC, achieving better results on some attack types.
+Our work focuses on MFCC and LFCC as well-understood baselines.
+
+For probability calibration, Platt~\cite{platt1999} showed that sigmoid fitting
+on held-out scores produces well-calibrated probabilities for SVM outputs. The
+alternative isotonic regression calibration~\cite{niculescu2005} requires more
+calibration data but makes no parametric assumption. We use Platt scaling.
+
+Recent deep learning approaches such as AASIST~\cite{jung2022aasist} use graph
+attention networks on raw waveforms, achieving $<1\%$ EER on ASVspoof~2019 LA eval.
+However, these methods require large datasets and are less interpretable. For this
+academic project, we favour interpretability and mathematical rigor over raw accuracy.
+
+Generalization to in-the-wild deepfakes was studied by M\"{u}ller et al.~\cite{muller2022},
+who showed significant performance drops for models trained only on ASVspoof data
+when tested on real-world deepfakes. Our external evaluation follows this methodology.
+
+% ─────────────────────────────────────────────
+\section{Mathematical Formulation}
+\label{sec:math}
+
+\subsection{Decision Hyperplane}
+
+Let $\mathbf{x}_i \in \mathbb{R}^d$ be the feature vector for sample $i$ and
+$y_i \in \{-1, +1\}$ be the class label ($+1$ = FAKE, $-1$ = REAL). The SVM
+finds a hyperplane:
+\begin{equation}
+  f(\mathbf{x}) = \mathbf{w}^\top \mathbf{x} + b
+\end{equation}
+with decision rule $\hat{y} = \text{sign}(f(\mathbf{x}))$.
+
+\subsection{Soft-Margin Primal Formulation}
+
+\begin{equation}
+  \min_{\mathbf{w}, b, \boldsymbol{\xi}} \quad
+  \frac{1}{2}\|\mathbf{w}\|^2 + \frac{C}{n}\sum_{i=1}^n \xi_i
+\end{equation}
+\begin{equation}
+  \text{subject to: } y_i(\mathbf{w}^\top \mathbf{x}_i + b) \geq 1 - \xi_i,
+  \quad \xi_i \geq 0
+\end{equation}
+
+Equivalently, using the hinge loss $\ell_H(t) = \max(0, 1-t)$:
+\begin{equation}
+  \min_{\mathbf{w}, b} \quad
+  \frac{1}{2}\|\mathbf{w}\|^2 + \frac{C}{n}\sum_{i=1}^n
+  \max\!\left(0,\; 1 - y_i(\mathbf{w}^\top \mathbf{x}_i + b)\right)
+  \label{eq:primal}
+\end{equation}
+
+\subsection{Subgradient Computation}
+
+Let $m_i = y_i f(\mathbf{x}_i)$. The subgradient of~\eqref{eq:primal} w.r.t. $\mathbf{w}$:
+
+\begin{equation}
+  \partial_\mathbf{w} J =
+  \begin{cases}
+    \mathbf{w} & \text{if } m_i \geq 1 \\
+    \mathbf{w} - \dfrac{C}{n}\,y_i\,\mathbf{x}_i & \text{if } m_i < 1
+  \end{cases}
+\end{equation}
+
+Subgradient w.r.t. $b$:
+\begin{equation}
+  \partial_b J =
+  \begin{cases}
+    0 & \text{if } m_i \geq 1 \\
+    -\dfrac{C}{n}\,y_i & \text{if } m_i < 1
+  \end{cases}
+\end{equation}
+
+\subsection{Pegasos Learning-Rate Schedule}
+
+The Pegasos algorithm~\cite{shalev2007} uses $\lambda = 1/C$ and schedule:
+\begin{equation}
+  \eta_t = \frac{1}{\lambda \cdot t}
+\end{equation}
+ensuring convergence in $O(1/(\lambda\varepsilon))$ iterations to $\varepsilon$-accuracy.
+
+\subsection{RBF Kernel SVM}
+
+The dual formulation with kernel $K$:
+\begin{equation}
+  \max_{\boldsymbol{\alpha}} \sum_i \alpha_i - \frac{1}{2}\sum_{i,j}
+  \alpha_i\alpha_j y_i y_j K(\mathbf{x}_i,\mathbf{x}_j)
+\end{equation}
+\begin{equation}
+  \text{s.t.}\quad 0 \leq \alpha_i \leq C,\quad \sum_i \alpha_i y_i = 0
+\end{equation}
+
+RBF kernel: $K(\mathbf{x}_i, \mathbf{x}_j) = \exp(-\gamma\|\mathbf{x}_i - \mathbf{x}_j\|^2)$.
+
+\subsection{Probability Calibration (Platt Scaling)}
+
+After training, the calibrated probability is:
+\begin{equation}
+  P(y{=}1 \mid f(\mathbf{x})) = \frac{1}{1 + \exp(A\cdot f(\mathbf{x}) + B)}
+\end{equation}
+where $A, B$ are fitted by minimising the cross-entropy on a held-out calibration set.
+
+The Expected Calibration Error (ECE) is:
+\begin{equation}
+  \text{ECE} = \sum_{b=1}^B \frac{|B_b|}{n}
+  \left|\overline{\text{acc}}(B_b) - \overline{\text{conf}}(B_b)\right|
+\end{equation}
+
+% ─────────────────────────────────────────────
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Dataset}
+We use the ASVspoof~2019 Logical Access (LA) partition following the official
+train/dev/eval split. Training: 2580 genuine + 22800 spoof. The \emph{eval}
+partition is treated as the held-out internal test set. For external evaluation,
+we use the In-the-Wild dataset~\cite{muller2022}.
+
+\subsection{Audio Preprocessing}
+All audio is decoded to 16~kHz mono, peak-normalised, and segmented into 3-second
+windows with 1.5-second hop (50\% overlap). Segments shorter than 0.5~seconds are
+rejected. Quality flags are raised for clipping $>1\%$ or speech ratio $<10\%$.
+
+\subsection{Feature Extraction}
+Feature vector construction:
+\begin{itemize}
+  \item \textbf{MFCC}: 20 coefficients + $\Delta$ + $\Delta\Delta$ (with 6 statistics each).
+  \item \textbf{LFCC}: 20 coefficients + $\Delta$ + $\Delta\Delta$ using a linear filterbank.
+  \item \textbf{Spectral}: centroid, bandwidth, rolloff, flatness, 7-band contrast, ZCR.
+  \item \textbf{Prosodic}: RMS energy, energy variation, F0 (pyin), voiced ratio.
+\end{itemize}
+Statistics computed per frame sequence: mean, std, median, 25th/75th percentile, max.
+
+\subsection{Models Compared}
+\begin{enumerate}
+  \item From-scratch Linear SVM (mini-batch subgradient)
+  \item scikit-learn LinearSVC
+  \item scikit-learn SVC(linear kernel)
+  \item scikit-learn SVC(RBF kernel) [\textbf{deployed}]
+  \item Logistic Regression (baseline)
+  \item Random Forest (baseline)
+\end{enumerate}
+
+Hyperparameter grid: $C \in \{0.01, 0.1, 1, 10, 100\}$;
+$\gamma \in \{\text{scale}, 0.001, 0.01, 0.1\}$ (RBF only).
+3-fold stratified CV on training partition.
+
+% ─────────────────────────────────────────────
+\section{Results and Discussion}
+\label{sec:results}
+
+\subsection{Feature Ablation Study}
+
+\begin{table}[htbp]
+\caption{Feature Ablation — Internal Dev Set Performance}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Feature Set & Accuracy & F1 & AUC & EER \\
+\midrule
+MFCC only            & [pending] & [pending] & [pending] & [pending] \\
+LFCC only            & [pending] & [pending] & [pending] & [pending] \\
+MFCC + LFCC          & [pending] & [pending] & [pending] & [pending] \\
+MFCC + LFCC + Spec.  & [pending] & [pending] & [pending] & [pending] \\
+All features         & [pending] & [pending] & [pending] & [pending] \\
+\bottomrule
+\end{tabular}
+\label{tab:ablation}
+\end{table}
+
+Results in Table~\ref{tab:ablation} are pending dataset download and
+training execution. Run the Colab notebook to populate these values.
+
+\subsection{Model Comparison}
+
+\begin{table}[htbp]
+\caption{Model Comparison — Internal Test Set}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Model & Acc. (\%) & F1 & AUC & EER (\%) \\
+\midrule
+Scratch Linear SVM   & [pending] & --- & --- & --- \\
+sklearn LinearSVC    & [pending] & --- & --- & --- \\
+SVC (linear)         & [pending] & --- & --- & --- \\
+SVC (RBF)            & [pending] & --- & --- & --- \\
+Logistic Regression  & [pending] & --- & --- & --- \\
+Random Forest        & [pending] & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\label{tab:model_comparison}
+\end{table}
+
+\subsection{Generalization Analysis}
+
+Internal vs. external dataset performance gap will be reported here after
+running the full experiment (Cells 29-30 in the Colab notebook).
+
+\subsection{Calibration Quality}
+
+Pre- and post-Platt-scaling Brier scores and ECE values are logged in
+Cell~27 of the notebook and saved to \texttt{results/metrics/}.
+
+% ─────────────────────────────────────────────
+\section{Limitations}
+\label{sec:limitations}
+
+\begin{enumerate}
+  \item \textbf{Generator generalisation}: Novel TTS/VC systems not seen during
+    training may evade the detector.
+  \item \textbf{Domain shift}: Performance degrades with different recording
+    conditions, acoustic environments, or heavy codec compression.
+  \item \textbf{Short audio}: Recordings $<0.5$~s are rejected; $<1$~s predictions
+    are less reliable.
+  \item \textbf{Colab hosting}: The Gradio app depends on an active Colab session.
+  \item \textbf{Not forensic evidence}: This system should not be sole evidence
+    in consequential decisions.
+\end{enumerate}
+
+% ─────────────────────────────────────────────
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have presented a complete, academically rigorous deepfake audio detection
+pipeline built on Support Vector Machines implemented from first principles.
+The mathematical treatment covers primal and dual SVM formulations, hinge loss,
+subgradient computation, Pegasos learning-rate schedules, the kernel trick, and
+Platt probability calibration. The interactive EchoVerify AI web application
+enables real-time prediction on user-uploaded audio. Future work should explore
+end-to-end neural approaches (e.g., Wav2Vec-based CM systems), multi-condition
+training for improved domain robustness, and ensemble calibration methods.
+
+% ─────────────────────────────────────────────
+\section{Individual Contribution Statement}
+\begin{itemize}
+  \item \textbf{[Author 1]}: [Describe specific contributions, e.g., SVM
+    implementation, feature extraction, evaluation]
+  \item \textbf{[Author 2]}: [Describe specific contributions, e.g., dataset
+    processing, Gradio app, report writing]
+\end{itemize}
+
+% ─────────────────────────────────────────────
+\begin{thebibliography}{99}
+
+\bibitem{wavenet2016}
+A. van den Oord et al., ``WaveNet: A Generative Model for Raw Audio,''
+\emph{arXiv:1609.03499}, 2016.
+
+\bibitem{tacotron2017}
+Y. Wang et al., ``Tacotron: Towards End-to-End Speech Synthesis,''
+in \emph{Proc. Interspeech}, 2017, pp. 4006--4010.
+
+\bibitem{valle2023}
+C. Wang et al., ``Neural Codec Language Models are Zero-Shot Text to Speech
+Synthesizers,'' \emph{arXiv:2301.02111}, 2023.
+
+\bibitem{asvspoof2019}
+X. Wang et al., ``ASVspoof 2019: A Large-Scale Public Database of Synthesized,
+Converted and Replayed Speech,'' \emph{Computer Speech \& Language},
+vol. 64, 2020.
+
+\bibitem{sahidullah2015}
+Md. Sahidullah et al., ``A Comparison of Features for Synthetic Speech Detection,''
+in \emph{Proc. Interspeech}, 2015, pp. 2087--2091.
+
+\bibitem{todisco2016}
+M. Todisco et al., ``A New Feature for Automatic Speaker Verification Anti-Spoofing:
+Constant Q Cepstral Coefficients,'' in \emph{Proc. Odyssey}, 2016, pp. 283--290.
+
+\bibitem{platt1999}
+J. Platt, ``Probabilistic Outputs for Support Vector Machines and Comparisons
+to Regularized Likelihood Methods,'' in \emph{Advances in Large Margin Classifiers},
+MIT Press, 1999, pp. 61--74.
+
+\bibitem{niculescu2005}
+A. Niculescu-Mizil and R. Caruana, ``Predicting Good Probabilities with Supervised
+Learning,'' in \emph{Proc. ICML}, 2005, pp. 625--632.
+
+\bibitem{shalev2007}
+S. Shalev-Shwartz et al., ``Pegasos: Primal Estimated sub-GrAdient SOlver for SVM,''
+in \emph{Proc. ICML}, 2007, pp. 807--814.
+
+\bibitem{jung2022aasist}
+J. Jung et al., ``AASIST: Audio Anti-Spoofing using Integrated Spectro-Temporal Graph
+Attention Networks,'' in \emph{Proc. ICASSP}, 2022.
+
+\bibitem{muller2022}
+N. M\"{u}ller et al., ``Does Audio Deepfake Detection Generalize?,''
+in \emph{Proc. Interspeech}, 2022.
+
+\end{thebibliography}
+
+\end{document}

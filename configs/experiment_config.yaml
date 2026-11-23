@@ -1,0 +1,189 @@
+# ═══════════════════════════════════════════════════════
+# experiment_config.yaml
+# Configuration for the Deepfake Audio Detection SVM project
+# Course: 22MAT220 – Mathematics for Computing III
+# ═══════════════════════════════════════════════════════
+
+project:
+  name: "Deepfake Audio Detection SVM"
+  version: "1.0.0"
+  course: "22MAT220 MFC-III"
+  random_seed: 42
+
+# ───────────────────────────────────────────────────────
+# Dataset configuration
+# ───────────────────────────────────────────────────────
+dataset:
+  primary:
+    name: "ASVspoof 2019 Logical Access"
+    url: "https://www.asvspoof.org/index2019.html"
+    # Google Drive folder containing extracted files
+    drive_folder_id: "CONFIGURE_ME"   # Replace with your Drive folder ID
+    # Expected structure:
+    #   LA/
+    #     ASVspoof2019_LA_train/
+    #     ASVspoof2019_LA_dev/
+    #     ASVspoof2019_LA_eval/
+    #     ASVspoof2019_LA_cm_protocols/
+    train_partition: "LA/ASVspoof2019_LA_train/flac"
+    dev_partition: "LA/ASVspoof2019_LA_dev/flac"
+    eval_partition: "LA/ASVspoof2019_LA_eval/flac"
+    protocol_dir: "LA/ASVspoof2019_LA_cm_protocols"
+
+  external:
+    name: "In-the-Wild Audio Deepfake Dataset"
+    url: "https://deepfake-demo.aisec.fraunhofer.de/in_the_wild"
+    drive_folder_id: "CONFIGURE_ME"
+
+  quick_demo:
+    # Use a small subset for pipeline testing (no full training)
+    max_train_samples: 500    # 250 real + 250 fake
+    max_val_samples: 200
+    max_test_samples: 200
+
+  full_experiment:
+    # Use full partitions
+    max_train_samples: null   # null = use all
+    max_val_samples: null
+    max_test_samples: null
+
+  labels:
+    real: 0
+    fake: 1
+
+# ───────────────────────────────────────────────────────
+# Audio preprocessing
+# ───────────────────────────────────────────────────────
+preprocessing:
+  target_sr: 16000
+  mono: true
+  normalize: true
+  normalization_method: "peak"   # "peak" or "rms"
+  segment_duration_s: 3.0
+  segment_hop_s: 1.5
+
+# ───────────────────────────────────────────────────────
+# Feature extraction
+# ───────────────────────────────────────────────────────
+features:
+  mfcc:
+    enabled: true
+    n_coefficients: 20
+    include_delta: true
+    include_delta2: true
+  lfcc:
+    enabled: true
+    n_coefficients: 20
+    include_delta: true
+    include_delta2: true
+  spectral:
+    enabled: true
+    n_spectral_contrast_bands: 6
+    include_chroma: false
+  prosodic:
+    enabled: true
+  stat_functions:
+    - "mean"
+    - "std"
+    - "median"
+    - "p25"
+    - "p75"
+    - "max"
+  # Feature ablation experiments
+  ablation_experiments:
+    mfcc_only:
+      mfcc: true
+      lfcc: false
+      spectral: false
+      prosodic: false
+    lfcc_only:
+      mfcc: false
+      lfcc: true
+      spectral: false
+      prosodic: false
+    mfcc_lfcc:
+      mfcc: true
+      lfcc: true
+      spectral: false
+      prosodic: false
+    mfcc_lfcc_spectral:
+      mfcc: true
+      lfcc: true
+      spectral: true
+      prosodic: false
+    all_features:
+      mfcc: true
+      lfcc: true
+      spectral: true
+      prosodic: true
+
+# ───────────────────────────────────────────────────────
+# From-scratch SVM
+# ───────────────────────────────────────────────────────
+scratch_svm:
+  C_candidates: [0.01, 0.1, 1.0, 10.0, 100.0]
+  max_epochs: 100
+  batch_size: 64
+  lr_schedule: "pegasos"   # "pegasos", "constant", "decay"
+  lr_init: 0.01            # for constant/decay schedules
+  tol: 1.0e-5
+  random_state: 42
+
+# ───────────────────────────────────────────────────────
+# scikit-learn models
+# ───────────────────────────────────────────────────────
+sklearn_models:
+  use_pca: false
+  pca_variance: 0.95
+  cv_folds: 3
+  scoring: "f1"
+  n_jobs: -1
+
+  linear_svc:
+    C: [0.01, 0.1, 1, 10, 100]
+  svc_linear:
+    C: [0.01, 0.1, 1, 10, 100]
+  svc_rbf:
+    C: [0.01, 0.1, 1, 10, 100]
+    gamma: ["scale", 0.001, 0.01, 0.1]
+  logistic:
+    C: [0.01, 0.1, 1, 10, 100]
+
+# ───────────────────────────────────────────────────────
+# Probability calibration
+# ───────────────────────────────────────────────────────
+calibration:
+  method: "platt"    # "platt" or "isotonic"
+  use_separate_calibration_set: true
+  calibration_fraction: 0.15   # fraction of training set for calibration
+
+# ───────────────────────────────────────────────────────
+# Evaluation
+# ───────────────────────────────────────────────────────
+evaluation:
+  threshold: 0.5           # classification threshold (p_fake)
+  bootstrap_n: 1000
+  bootstrap_ci: 0.95
+  calibration_bins: 10
+
+# ───────────────────────────────────────────────────────
+# Paths
+# ───────────────────────────────────────────────────────
+paths:
+  base_dir: "/content/deepfake-audio-svm"   # Colab path
+  data_dir: "/content/data"
+  model_dir: "/content/models"
+  results_dir: "/content/results"
+  cache_dir: "/content/features_cache"
+
+  # Google Drive mount point (Colab)
+  drive_mount: "/content/drive"
+  drive_project_folder: "/content/drive/MyDrive/22MAT220_Deepfake_SVM"
+
+# ───────────────────────────────────────────────────────
+# Gradio app
+# ───────────────────────────────────────────────────────
+app:
+  share: true
+  debug: true
+  server_port: 7860

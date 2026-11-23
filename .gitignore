@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Caching
+.pytest_cache/
+features_cache/
+*.npy
+*.npz
+
+# Model artifacts (too large for git)
+models/*.joblib
+models/*.pkl
+models/*.sav
+
+# Data (download separately)
+data/
+*.flac
+*.wav
+*.mp3
+*.ogg
+*.m4a
+
+# Colab
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Results that are generated outputs (keep figures dir, ignore large caches)
+results/metrics/*.json
+results/tables/*.csv
