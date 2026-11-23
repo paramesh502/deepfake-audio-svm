@@ -18,18 +18,42 @@ This project implements a complete, academically rigorous deepfake audio detecti
 
 ---
 
-## Quick Start (Google Colab)
+## Quick Start
 
-```python
-# 1. Mount Drive and clone/upload the project
-from google.colab import drive
-drive.mount('/content/drive')
+### Option A: Run Locally on Your Laptop
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/paramesh502/deepfake-audio-svm.git
+cd deepfake-audio-svm
 
 # 2. Install dependencies
-!pip install -r requirements.txt
+pip install -r requirements.txt
+# Or install as a package: pip install -e .
 
-# 3. Open and run the notebook
-# notebooks/Deepfake_Audio_Detection_SVM_Colab.ipynb
+# 3. Download ASVspoof 2019 LA dataset → place in ./data/LA/
+#    See documentation/dataset_instructions.md
+
+# 4a. Run the full pipeline (train + evaluate + save model)
+python run_local.py --data-dir ./data --mode quick
+#    Use --mode full for the complete dataset
+#    Add --launch-app to start the Gradio website after training
+
+# 4b. Or just launch the web app (if model is already trained)
+python run_app.py
+#    Add --share for a public link
+
+# 5. Or use the local Jupyter notebook
+jupyter notebook notebooks/Deepfake_Audio_Detection_SVM_Local.ipynb
+```
+
+### Option B: Run in Google Colab
+
+```python
+# 1. Upload notebooks/Deepfake_Audio_Detection_SVM_Colab.ipynb to Colab
+# 2. Run all cells top to bottom
+# 3. Mount Google Drive and configure dataset path
+# 4. The Colab notebook handles Drive mounting automatically
 ```
 
 ---
@@ -39,7 +63,8 @@ drive.mount('/content/drive')
 ```
 deepfake-audio-svm/
 ├── notebooks/
-│   └── Deepfake_Audio_Detection_SVM_Colab.ipynb  # Main Colab notebook
+│   ├── Deepfake_Audio_Detection_SVM_Colab.ipynb  # Colab notebook (76 cells)
+│   └── Deepfake_Audio_Detection_SVM_Local.ipynb  # Local Jupyter notebook (20 cells)
 ├── src/
 │   ├── preprocessing.py       # Audio loading, validation, segmentation
 │   ├── features.py            # MFCC, LFCC, spectral, prosodic features
@@ -49,6 +74,9 @@ deepfake-audio-svm/
 │   ├── evaluation.py          # Metrics: accuracy, F1, AUC, EER, etc.
 │   ├── inference.py           # Standalone inference pipeline
 │   └── app.py                 # Gradio EchoVerify AI web application
+├── run_local.py               # Local CLI: full pipeline (train + eval + save)
+├── run_app.py                 # Local CLI: launch just the Gradio app
+├── pyproject.toml             # Package config for `pip install -e .`
 ├── configs/
 │   └── experiment_config.yaml # All hyperparameters and paths
 ├── models/
