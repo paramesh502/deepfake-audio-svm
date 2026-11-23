@@ -39,6 +39,9 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Results that are generated outputs (keep figures dir, ignore large caches)
+# Results — ignore generated data but keep figures and structure
 results/metrics/*.json
 results/tables/*.csv
+# keep figures in git
+!results/figures/
+!results/figures/*.png

@@ -1,13 +1,11 @@
 # ═══════════════════════════════════════════════════════
 # requirements.txt
 # Deepfake Audio Detection SVM — 22MAT220 Project
+# Works on: macOS, Linux, Windows
 # ═══════════════════════════════════════════════════════
 #
-# Install in Colab with:
-#   !pip install -r requirements.txt
-#
-# Or install individually:
-#   !pip install librosa soundfile scikit-learn gradio joblib scipy numpy matplotlib
+# Install with:
+#   pip install -r requirements.txt
 
 # Core scientific computing
 numpy>=1.23.0
@@ -33,6 +31,12 @@ seaborn>=0.12.0
 # Configuration
 pyyaml>=6.0
 
+# Dataset loading (parquet files from HuggingFace)
+pyarrow>=12.0.0
+
+# Real-time microphone recording
+sounddevice>=0.4.6
+
 # Notebook / Colab utilities
 ipython>=8.0.0
 ipywidgets>=8.0.0
@@ -41,8 +45,5 @@ tqdm>=4.65.0
 # Testing
 pytest>=7.4.0
 
-# Optional: faster audio decoding (recommended for MP3 support)
-# audioread>=3.0.0
-
-# Optional: pandas for data management
+# Data management
 pandas>=1.5.0
